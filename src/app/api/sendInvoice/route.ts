@@ -55,9 +55,9 @@ import sgMail from "@sendgrid/mail";
 sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
 async function generateInvoicePdf({
-  logoText = "YOUR LOGO",
+  logoText = "AR FZC LOGO",
   invoiceNumber = "000001",
-  date = "01 Jan, 2030",
+  date = "01 January, 2030",
   billedTo,
   billedFrom,
   items,
@@ -69,7 +69,12 @@ async function generateInvoicePdf({
   date?: string;
   billedTo: { name: string; address: string; email: string };
   billedFrom: { name: string; address: string; email: string };
-  items: Array<{ description: string; quantity: number; amount: number }>;
+  items: Array<{
+    description: string;
+    quantity: number;
+    amount: number;
+    gstPercent?: number;
+  }>;
   paymentMethod?: string;
   note?: string;
 }) {
@@ -173,14 +178,17 @@ async function generateInvoicePdf({
   let total = 0;
   y -= 25;
   for (const item of items) {
-    const { description, quantity, amount } = item;
-    const pricePerUnit = amount / (quantity || 1);
+    const { description, quantity, amount, gstPercent = 0 } = item;
+    const baseTotal = (amount || 0) * (quantity || 0);
+    const itemTotal = baseTotal * (1 + gstPercent / 100);
+    const pricePerUnit = baseTotal / (quantity || 1);
+
     page.drawText(description, { x: 50, y, size: 12, font });
     page.drawText(String(quantity), { x: 270, y, size: 12, font });
     page.drawText(`$${pricePerUnit.toFixed(2)}`, { x: 355, y, size: 12, font });
-    page.drawText(`$${amount.toFixed(2)}`, { x: 460, y, size: 12, font });
+    page.drawText(`$${itemTotal.toFixed(2)}`, { x: 460, y, size: 12, font });
     y -= 22;
-    total += amount;
+    total += itemTotal;
   }
 
   // Total line
@@ -219,25 +227,45 @@ export async function POST(request: Request) {
     const doc = await request.json();
 
     // Fill in the details from your Sanity doc structure
+    if (!doc || !doc.invoiceSent) {
+      return NextResponse.json(
+        { message: "No invoice sent flag found" },
+        { status: 400 }
+      );
+    }
+
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
     const pdfBytes = await generateInvoicePdf({
-      logoText: "YOUR LOGO",
+      logoText: "AR FZC LOGO",
       invoiceNumber: "000001", // You can auto-generate this
-      date: "02 June, 2030", // Or from doc.submittedAt
+      date: formattedDate,
       billedTo: {
         name: doc.name,
         address: doc.invoiceDetails?.billingInfo || "",
         email: doc.email,
       },
       billedFrom: {
-        name: "Olivia Wilson",
+        name: "Testing POC",
         address: "123 Anywhere St., Any City",
-        email: "hello@reallygreatsite.com",
+        email: "hello@abc.com",
       },
       items: (doc.invoiceDetails?.items || []).map(
-        (item: { description: string; quantity: number; amount: number }) => ({
+        (item: {
+          description: string;
+          quantity: number;
+          amount: number;
+          gstPercent?: number;
+        }) => ({
           description: item.description,
           quantity: item.quantity,
           amount: item.amount,
+          gstPercent: item.gstPercent ?? 0,
         })
       ),
       paymentMethod: "Cash", // Or from your doc if desired
