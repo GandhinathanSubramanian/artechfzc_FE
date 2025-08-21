@@ -13,6 +13,7 @@
     "@sanity/client": "^7.8.2",
     "@sendgrid/mail": "^8.1.5",
     "next": "15.4.6",
+    "pdf-lib": "^1.17.1",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
