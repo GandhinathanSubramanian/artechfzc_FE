@@ -48,10 +48,82 @@
 //   }
 // }
 
+// import { PDFDocument, StandardFonts } from "pdf-lib";
+// import { NextResponse } from "next/server";
+// import sgMail from "@sendgrid/mail";
+// sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+// async function generateInvoicePdf({
+//   name,
+//   serviceName,
+//   price,
+//   billingInfo,
+// }: {
+//   name: string;
+//   serviceName: string;
+//   price: number;
+//   billingInfo: string;
+// }) {
+//   const pdfDoc = await PDFDocument.create();
+//   const page = pdfDoc.addPage([400, 300]);
+//   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+//   page.drawText("Invoice", { x: 160, y: 280, size: 20, font });
+//   page.drawText(`Name: ${name}`, { x: 20, y: 250, size: 12, font });
+//   page.drawText(`Service: ${serviceName}`, { x: 20, y: 230, size: 12, font });
+//   page.drawText(`Price: $${price}`, { x: 20, y: 210, size: 12, font });
+//   page.drawText(`Billing Info:`, { x: 20, y: 190, size: 12, font });
+//   page.drawText(billingInfo, { x: 20, y: 170, size: 12, font });
+//   return await pdfDoc.save();
+// }
+// export async function POST(request: Request) {
+//   try {
+//     const doc = await request.json();
+//     if (!doc || !doc.invoiceSent) {
+//       return NextResponse.json(
+//         { message: "No invoice sent flag found" },
+//         { status: 400 }
+//       );
+//     }
+//     const pdfBytes = await generateInvoicePdf({
+//       name: doc.name,
+//       serviceName: doc.serviceName,
+//       price: doc.invoiceDetails.price,
+//       billingInfo: doc.invoiceDetails.billingInfo,
+//     });
+//     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
+//     const msg = {
+//       to: doc.email,
+//       from: "gandhinathan1447@gmail.com",
+//       subject: "Your Consultation Invoice",
+//       html: `
+// <h2>Hello ${doc.name},</h2>
+// <p>Thank you for your consultation.</p>
+// <p><strong>Service:</strong> ${doc.serviceName} (${doc.serviceType})</p>
+// <p><strong>Price:</strong> $${doc.invoiceDetails.price}</p>
+// <p><strong>Billing Info:</strong> ${doc.invoiceDetails.billingInfo}</p>
+// <p>Please see attached invoice PDF.</p>
+//       `,
+//       attachments: [
+//         {
+//           content: pdfBase64,
+//           filename: "invoice.pdf",
+//           type: "application/pdf",
+//           disposition: "attachment",
+//         },
+//       ],
+//     };
+//     await sgMail.send(msg);
+//     return NextResponse.json({ message: "Invoice email sent with PDF" });
+//   } catch (error) {
+//     console.error("SendInvoice error:", error);
+//     return NextResponse.json(
+//       { message: "Failed to send email" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
 import { NextResponse } from "next/server";
 import sgMail from "@sendgrid/mail";
-import puppeteer from "puppeteer-core";
-import chromium from "chrome-aws-lambda";
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
@@ -79,7 +151,7 @@ function getInvoiceHtml({
         .invoice-details { margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background: #f5f5f5; }
+        th { background-color: #eee; }
         .total { font-weight: bold; }
       </style>
     </head>
@@ -103,9 +175,7 @@ function getInvoiceHtml({
           <tr><td>${serviceName}</td><td>$${price.toFixed(2)}</td></tr>
         </tbody>
         <tfoot>
-          <tr><td class="total">Total</td><td class="total">$${price.toFixed(
-            2
-          )}</td></tr>
+          <tr><td>Total</td><td>$${price.toFixed(2)}</td></tr>
         </tfoot>
       </table>
       <div class="footer">
@@ -127,7 +197,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Launch Puppeteer with chrome-aws-lambda for Vercel compatibility
+    // Dynamically import puppeteer-core and chrome-aws-lambda
+    const puppeteerModule = await import("puppeteer-core");
+    const chromiumModule = await import("chrome-aws-lambda");
+
+    const puppeteer = puppeteerModule.default || puppeteerModule;
+    const chromium = chromiumModule.default || chromiumModule;
+
+    // Launch browser
     const browser = await puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath,
@@ -136,7 +213,6 @@ export async function POST(request: Request) {
 
     const page = await browser.newPage();
 
-    // Generate HTML invoice
     const html = getInvoiceHtml({
       name: doc.name,
       serviceName: doc.serviceName,
@@ -154,13 +230,9 @@ export async function POST(request: Request) {
 
     const msg = {
       to: doc.email,
-      from: "gandhinathan1447@gmail.com",
+      from: "gandhinathan1447@gmail.com", // Use your verified SendGrid sender
       subject: "Your Consultation Invoice",
-      html: `
-        <h2>Hello ${doc.name},</h2>
-        <p>Thank you for your consultation.</p>
-        <p>Please find your invoice attached.</p>
-      `,
+      html: `<p>Hello ${doc.name}, please find your invoice attached.</p>`,
       attachments: [
         {
           content: pdfBase64,
