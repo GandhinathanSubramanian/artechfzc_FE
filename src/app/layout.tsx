@@ -32,7 +32,9 @@ export default function RootLayout({
       >
         <div className="bg-amber-500 min-h-screen">
           <HeaderComponent />
-          <div className="py-10">{children}</div>
+          <main className="py-10">
+            <div className="p-6">{children}</div>
+          </main>
           <FooterComponent />
         </div>
       </body>

@@ -1,8 +1,7 @@
 import { sanityClient } from "@/lib/sanity";
-import { type ServiceProps } from "@/app/interface";
 
 // Fetch services from Sanity
-export const ServicesApi: ServiceProps[] = await sanityClient.fetch(
+export const ServicesApi = await sanityClient.fetch(
   `*[_type == "service"]{
       _id,
       title,

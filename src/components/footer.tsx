@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export const FooterComponent = () => {
   return (
-    <footer className="bg-amber-100 h-50">
+    <footer className="bg-amber-100 flex flex-col h-50 justify-center items-center gap-y-4">
       <div className="flex gap-x-4">
         <Link
           href="/privacy-policy"

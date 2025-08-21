@@ -6,6 +6,12 @@ export type ServiceTypes = {
   imageUrl?: string;
 };
 
+export interface SubServiceTypes {
+  title: string;
+  description: string;
+  imageUrl?: string;
+}
+
 export interface ImageComponentProps {
   src: string;
   alt: string;
