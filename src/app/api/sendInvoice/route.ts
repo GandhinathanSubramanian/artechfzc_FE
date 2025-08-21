@@ -48,60 +48,209 @@
 //   }
 // }
 
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { NextResponse } from "next/server";
 import sgMail from "@sendgrid/mail";
+
 sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+
 async function generateInvoicePdf({
-  name,
-  serviceName,
-  price,
-  billingInfo,
+  logoText = "YOUR LOGO",
+  invoiceNumber = "000001",
+  date = "01 Jan, 2030",
+  billedTo,
+  billedFrom,
+  items,
+  paymentMethod = "Cash",
+  note = "Thank you for choosing us!",
 }: {
-  name: string;
-  serviceName: string;
-  price: number;
-  billingInfo: string;
+  logoText?: string;
+  invoiceNumber?: string;
+  date?: string;
+  billedTo: { name: string; address: string; email: string };
+  billedFrom: { name: string; address: string; email: string };
+  items: Array<{ description: string; quantity: number; amount: number }>;
+  paymentMethod?: string;
+  note?: string;
 }) {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([400, 300]);
+  const page = pdfDoc.addPage([600, 750]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  page.drawText("Invoice", { x: 160, y: 280, size: 20, font });
-  page.drawText(`Name: ${name}`, { x: 20, y: 250, size: 12, font });
-  page.drawText(`Service: ${serviceName}`, { x: 20, y: 230, size: 12, font });
-  page.drawText(`Price: $${price}`, { x: 20, y: 210, size: 12, font });
-  page.drawText(`Billing Info:`, { x: 20, y: 190, size: 12, font });
-  page.drawText(billingInfo, { x: 20, y: 170, size: 12, font });
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  let y = 700; // Starting y position
+
+  // Header
+  page.drawText(logoText, {
+    x: 40,
+    y,
+    size: 12,
+    font,
+    color: rgb(0.2, 0.2, 0.2),
+  });
+  page.drawText(`NO. ${invoiceNumber}`, {
+    x: 490,
+    y,
+    size: 12,
+    font,
+    color: rgb(0.25, 0.25, 0.25),
+  });
+
+  // Big INVOICE title
+  y -= 40;
+  page.drawText("INVOICE", { x: 40, y, size: 38, font: fontBold });
+
+  // Date
+  y -= 30;
+  page.drawText("Date:", { x: 40, y, size: 12, font: fontBold });
+  page.drawText(date, { x: 80, y, size: 12, font });
+
+  // Billed to and From blocks
+  y -= 40;
+  page.drawText("Billed to:", { x: 40, y, size: 12, font: fontBold });
+  page.drawText("From:", { x: 340, y, size: 12, font: fontBold });
+
+  const startY = y - 15;
+  page.drawText(billedTo.name, { x: 40, y: startY, size: 11, font });
+  page.drawText(billedTo.address, { x: 40, y: startY - 14, size: 11, font });
+  page.drawText(billedTo.email, {
+    x: 40,
+    y: startY - 28,
+    size: 11,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+
+  page.drawText(billedFrom.name, { x: 340, y: startY, size: 11, font });
+  page.drawText(billedFrom.address, { x: 340, y: startY - 14, size: 11, font });
+  page.drawText(billedFrom.email, {
+    x: 340,
+    y: startY - 28,
+    size: 11,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+
+  // Table headers
+  y = startY - 55;
+  page.drawRectangle({
+    x: 40,
+    y: y - 5,
+    width: 520,
+    height: 25,
+    color: rgb(0.84, 0.84, 0.86),
+  });
+  page.drawText("Item", {
+    x: 50,
+    y: y + 8,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.38, 0.38, 0.38),
+  });
+  page.drawText("Quantity", {
+    x: 260,
+    y: y + 8,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.38, 0.38, 0.38),
+  });
+  page.drawText("Price", {
+    x: 355,
+    y: y + 8,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.38, 0.38, 0.38),
+  });
+  page.drawText("Amount", {
+    x: 460,
+    y: y + 8,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.38, 0.38, 0.38),
+  });
+
+  // Table body
+  let total = 0;
+  y -= 25;
+  for (const item of items) {
+    const { description, quantity, amount } = item;
+    const pricePerUnit = amount / (quantity || 1);
+    page.drawText(description, { x: 50, y, size: 12, font });
+    page.drawText(String(quantity), { x: 270, y, size: 12, font });
+    page.drawText(`$${pricePerUnit.toFixed(2)}`, { x: 355, y, size: 12, font });
+    page.drawText(`$${amount.toFixed(2)}`, { x: 460, y, size: 12, font });
+    y -= 22;
+    total += amount;
+  }
+
+  // Total line
+  y -= 10;
+  page.drawLine({
+    start: { x: 350, y: y + 5 },
+    end: { x: 540, y: y + 5 },
+    thickness: 1.5,
+    color: rgb(0.7, 0.7, 0.7),
+  });
+  page.drawText("Total", { x: 355, y: y - 10, size: 13, font: fontBold });
+  page.drawText(`$${total.toFixed(2)}`, {
+    x: 460,
+    y: y - 10,
+    size: 13,
+    font: fontBold,
+  });
+
+  // Payment method and note
+  y -= 40;
+  page.drawText(`Payment method:  ${paymentMethod}`, {
+    x: 40,
+    y,
+    size: 12,
+    font: fontBold,
+  });
+  y -= 22;
+  page.drawText("Note: ", { x: 40, y, size: 12, font: fontBold });
+  page.drawText(note, { x: 95, y, size: 12, font });
+
   return await pdfDoc.save();
 }
+
 export async function POST(request: Request) {
   try {
     const doc = await request.json();
-    if (!doc || !doc.invoiceSent) {
-      return NextResponse.json(
-        { message: "No invoice sent flag found" },
-        { status: 400 }
-      );
-    }
+
+    // Fill in the details from your Sanity doc structure
     const pdfBytes = await generateInvoicePdf({
-      name: doc.name,
-      serviceName: doc.serviceName,
-      price: doc.invoiceDetails.price,
-      billingInfo: doc.invoiceDetails.billingInfo,
+      logoText: "YOUR LOGO",
+      invoiceNumber: "000001", // You can auto-generate this
+      date: "02 June, 2030", // Or from doc.submittedAt
+      billedTo: {
+        name: doc.name,
+        address: doc.invoiceDetails?.billingInfo || "",
+        email: doc.email,
+      },
+      billedFrom: {
+        name: "Olivia Wilson",
+        address: "123 Anywhere St., Any City",
+        email: "hello@reallygreatsite.com",
+      },
+      items: (doc.invoiceDetails?.items || []).map(
+        (item: { description: string; quantity: number; amount: number }) => ({
+          description: item.description,
+          quantity: item.quantity,
+          amount: item.amount,
+        })
+      ),
+      paymentMethod: "Cash", // Or from your doc if desired
+      note: "Thank you for choosing us!",
     });
+
     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
+
     const msg = {
       to: doc.email,
-      from: "gandhinathan1447@gmail.com",
+      from: "gandhinathan1447@gmail.com", // Verified sender
       subject: "Your Consultation Invoice",
-      html: `
-<h2>Hello ${doc.name},</h2>
-<p>Thank you for your consultation.</p>
-<p><strong>Service:</strong> ${doc.serviceName} (${doc.serviceType})</p>
-<p><strong>Price:</strong> $${doc.invoiceDetails.price}</p>
-<p><strong>Billing Info:</strong> ${doc.invoiceDetails.billingInfo}</p>
-<p>Please see attached invoice PDF.</p>
-      `,
+      html: `<p>Hello ${doc.name}, please see your invoice attached.</p>`,
       attachments: [
         {
           content: pdfBase64,
@@ -111,7 +260,9 @@ export async function POST(request: Request) {
         },
       ],
     };
+
     await sgMail.send(msg);
+
     return NextResponse.json({ message: "Invoice email sent with PDF" });
   } catch (error) {
     console.error("SendInvoice error:", error);
@@ -121,136 +272,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-// import { NextResponse } from "next/server";
-// import sgMail from "@sendgrid/mail";
-
-// sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
-
-// function getInvoiceHtml({
-//   name,
-//   serviceName,
-//   price,
-//   billingInfo,
-// }: {
-//   name: string;
-//   serviceName: string;
-//   price: number;
-//   billingInfo: string;
-// }) {
-//   return `
-//   <!DOCTYPE html>
-//   <html>
-//     <head>
-//       <meta charset="utf-8" />
-//       <title>Invoice</title>
-//       <style>
-//         body { font-family: Arial, sans-serif; margin: 40px; }
-//         h1 { color: #333; }
-//         .header, .footer { text-align: center; margin-bottom: 40px; }
-//         .invoice-details { margin-bottom: 20px; }
-//         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-//         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-//         th { background-color: #eee; }
-//         .total { font-weight: bold; }
-//       </style>
-//     </head>
-//     <body>
-//       <div class="header">
-//         <h1>Invoice</h1>
-//         <p>Your Company<br/>1234 Your Street<br/>City, State ZIP<br/>Phone: 555-555-5555</p>
-//       </div>
-//       <div class="invoice-details">
-//         <strong>Billed To:</strong><br/>
-//         ${name}<br/>
-//         Billing Info: ${billingInfo}<br/><br/>
-//         <strong>Service:</strong> ${serviceName}<br/>
-//         <strong>Price:</strong> $${price.toFixed(2)}<br/>
-//       </div>
-//       <table>
-//         <thead>
-//           <tr><th>Description</th><th>Amount</th></tr>
-//         </thead>
-//         <tbody>
-//           <tr><td>${serviceName}</td><td>$${price.toFixed(2)}</td></tr>
-//         </tbody>
-//         <tfoot>
-//           <tr><td>Total</td><td>$${price.toFixed(2)}</td></tr>
-//         </tfoot>
-//       </table>
-//       <div class="footer">
-//         <p>Thank you for your business!</p>
-//       </div>
-//     </body>
-//   </html>
-//   `;
-// }
-
-// export async function POST(request: Request) {
-//   try {
-//     const doc = await request.json();
-
-//     if (!doc || !doc.invoiceSent) {
-//       return NextResponse.json(
-//         { message: "No invoice sent flag found" },
-//         { status: 400 }
-//       );
-//     }
-
-//     // Dynamically import puppeteer-core and chrome-aws-lambda
-//     const puppeteerModule = await import("puppeteer-core");
-//     const chromiumModule = await import("chrome-aws-lambda");
-
-//     const puppeteer = puppeteerModule.default || puppeteerModule;
-//     const chromium = chromiumModule.default || chromiumModule;
-
-//     // Launch browser
-//     const browser = await puppeteer.launch({
-//       args: chromium.args,
-//       executablePath: await chromium.executablePath,
-//       headless: chromium.headless,
-//     });
-
-//     const page = await browser.newPage();
-
-//     const html = getInvoiceHtml({
-//       name: doc.name,
-//       serviceName: doc.serviceName,
-//       price: doc.invoiceDetails.price,
-//       billingInfo: doc.invoiceDetails.billingInfo,
-//     });
-
-//     await page.setContent(html, { waitUntil: "networkidle0" });
-
-//     const pdfBuffer = await page.pdf({ format: "a4", printBackground: true });
-
-//     await browser.close();
-
-//     const pdfBase64 = pdfBuffer.toString("base64");
-
-//     const msg = {
-//       to: doc.email,
-//       from: "gandhinathan1447@gmail.com", // Use your verified SendGrid sender
-//       subject: "Your Consultation Invoice",
-//       html: `<p>Hello ${doc.name}, please find your invoice attached.</p>`,
-//       attachments: [
-//         {
-//           content: pdfBase64,
-//           filename: "invoice.pdf",
-//           type: "application/pdf",
-//           disposition: "attachment",
-//         },
-//       ],
-//     };
-
-//     await sgMail.send(msg);
-
-//     return NextResponse.json({ message: "Invoice email sent with PDF" });
-//   } catch (error) {
-//     console.error("SendInvoice error:", error);
-//     return NextResponse.json(
-//       { message: "Failed to send email" },
-//       { status: 500 }
-//     );
-//   }
-// }
