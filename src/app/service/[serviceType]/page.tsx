@@ -7,9 +7,10 @@ import { getServiceByName } from "@/lib/api";
 export default async function ServiceTypePage({
   params,
 }: {
-  params: { serviceType: string };
+  params: Promise<{ serviceType: string }>;
 }) {
-  const service = await getServiceByName(params.serviceType.replace(/_/g, " "));
+  const { serviceType } = await params;
+  const service = await getServiceByName(serviceType.replace(/_/g, " "));
 
   if (!service) return <div>Service not found</div>;
 
