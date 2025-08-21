@@ -152,6 +152,13 @@ async function generateInvoicePdf({
     font: fontBold,
     color: rgb(0.38, 0.38, 0.38),
   });
+  page.drawText("Price", {
+    x: 355,
+    y: y + 8,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.38, 0.38, 0.38),
+  });
   page.drawText("Quantity", {
     x: 260,
     y: y + 8,
@@ -159,7 +166,7 @@ async function generateInvoicePdf({
     font: fontBold,
     color: rgb(0.38, 0.38, 0.38),
   });
-  page.drawText("Price", {
+  page.drawText("GST%", {
     x: 355,
     y: y + 8,
     size: 12,
@@ -184,8 +191,9 @@ async function generateInvoicePdf({
     const pricePerUnit = baseTotal / (quantity || 1);
 
     page.drawText(description, { x: 50, y, size: 12, font });
-    page.drawText(String(quantity), { x: 270, y, size: 12, font });
     page.drawText(`$${pricePerUnit.toFixed(2)}`, { x: 355, y, size: 12, font });
+    page.drawText(String(quantity), { x: 270, y, size: 12, font });
+    page.drawText(`${gstPercent}%`, { x: 270, y, size: 12, font });
     page.drawText(`$${itemTotal.toFixed(2)}`, { x: 460, y, size: 12, font });
     y -= 22;
     total += itemTotal;
