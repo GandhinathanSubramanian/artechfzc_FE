@@ -10,6 +10,7 @@ export default async function ServiceTypePage({
   params: Promise<{ serviceType: string }>;
 }) {
   const { serviceType } = await params;
+  console.log(serviceType, "serviceType");
   const service = await getServiceByName(serviceType.replace(/_/g, " "));
 
   if (!service) return <div>Service not found</div>;
